@@ -13,8 +13,9 @@ median() { sort -n | sed -n "$(( (REPS + 1) / 2 ))p"; }
 stage_and_run() {
     local name=$1 exe=$2 plat=$3 runner=$4; shift 4
     local d=$HERE/work/train/$plat/$name; rm -rf "$d"; mkdir -p "$d"
-    cp "$BIN/$exe" "$d/"
-    eval "stage_$name \"\$d\""
+    # Staging problems are recorded in status.txt (a "stage:" line) so the caller can fail the case.
+    cp "$BIN/$exe" "$d/" || echo "stage: copy of $exe failed" >> "$d/status.txt"
+    eval "stage_$name \"\$d\"" || echo "stage: staging inputs failed" >> "$d/status.txt"
     local times=() r
     for ((r = 0; r < REPS; r++)); do
         local t0=$(date +%s%N)
@@ -35,6 +36,8 @@ stage_omnetpp() { cp $B/520.omnetpp_r/data/train/input/omnetpp.ini "$1/"; cp -r 
 cmds_omnetpp()  { $1 ./omnetpp_r -c General -r 0 > stdout.txt; }
 
 declare -A EXE=( [gcc]=502.gcc_r/@PLAT@/cpugcc_r [mcf]=505.mcf_r/@PLAT@/mcf_r [imagick]=538.imagick_r/@PLAT@/imagick_r [omnetpp]=520.omnetpp_r/@PLAT@/omnetpp_r )
+declare -A REQ=( [gcc]="200.s scilab.s train01.s" [mcf]="mcf.out stdout.txt" [imagick]="train_output.tga" [omnetpp]="stdout.txt General-0.sca" )
+FAIL=0   # any problem in any requested case makes the script exit non-zero
 printf '%-10s %12s %12s %9s  %s\n' "bench(train)" "native(ms)" "lfi(ms)" ratio status
 for b in ${BENCHES:-gcc mcf imagick omnetpp}; do
     res=()
@@ -52,14 +55,32 @@ for b in ${BENCHES:-gcc mcf imagick omnetpp}; do
     for p in native-linux lfi; do
         [ -s $HERE/work/train/$p/$b/status.txt ] && status="EXIT FAIL($p): $(tr '\n' ' ' < $HERE/work/train/$p/$b/status.txt)"
     done
-    out_bad=
-    # compare every produced file (stdout, images, assembly), skipping only inputs, executables and stderr
-    for f in $(cd $a && ls | grep -v -E "^(err.txt|status.txt|cpugcc_r|mcf_r|imagick_r|omnetpp_r|ned|train_input.tga|omnetpp.ini|inp.in|200.c|scilab.c|train01.c)$"); do
-        [ -f $l/$f ] || { out_bad="$out_bad missing:$f"; continue; }
-        cmp -s $a/$f $l/$f && continue
-        case $f in *.txt|*.s) python3 $HERE/numdiff.py $a/$f $l/$f || out_bad="$out_bad $f";; *) out_bad="$out_bad $f";; esac
+    for v in "${res[0]}" "${res[1]}"; do
+        [[ "$v" =~ ^[0-9]+$ ]] && [ "$v" -gt 0 ] || status="$status; no timing sample"
     done
-    [ -n "$out_bad" ] && status="$status OUTPUT DIFFERS:$out_bad"
-    [ -s $l/err.txt ] && grep -q "rror\|illegal" $l/err.txt && status="$status stderr: $(head -c 100 $l/err.txt)"
-    printf '%-10s %12s %12s %8.2fx  %s\n' "$b" "${res[0]}" "${res[1]}" "$(awk -v a="${res[1]}" -v b="${res[0]}" 'BEGIN{printf "%.3f", a/b}')" "$status"
+    out_bad=
+    for f in ${REQ[$b]}; do
+        for p in native-linux lfi; do
+            [ -s $HERE/work/train/$p/$b/$f ] || out_bad="$out_bad required-missing-or-empty($p):$f"
+        done
+    done
+    # every file either side produced (recursively; inputs, executables and stderr excepted) must
+    # be present on both sides and agree
+    lst() { (cd $HERE/work/train/$1/$b && find . -type f ! -name err.txt ! -name status.txt ! -perm -u+x ! -name train_input.tga ! -name omnetpp.ini ! -name inp.in ! -name '*.c' ! -path './ned/*' | sort); }
+    for f in $( (lst native-linux; lst lfi) | sort -u ); do
+        [ -e $a/$f ] && [ -e $l/$f ] || { out_bad="$out_bad only-one-side:$f"; continue; }
+        cmp -s $a/$f $l/$f && continue
+        case $f in *.txt|*.s|*.out) python3 $HERE/numdiff.py $a/$f $l/$f || out_bad="$out_bad $f";; *) out_bad="$out_bad $f";; esac
+    done
+    [ -n "$out_bad" ] && status="$status; OUTPUT DIFFERS:$out_bad"
+    [ -s $l/err.txt ] && grep -q "rror\|illegal" $l/err.txt && status="$status; stderr: $(head -c 100 $l/err.txt)"
+    status=${status#; }
+    if [ "$status" = ok ]; then
+        printf '%-10s %12s %12s %8.2fx  %s\n' "$b" "${res[0]}" "${res[1]}" "$(awk -v a="${res[1]}" -v b="${res[0]}" 'BEGIN{printf "%.3f", a/b}')" "$status"
+    else
+        FAIL=1
+        printf '%-10s %12s %12s %9s  %s\n' "$b" "${res[0]:--}" "${res[1]:--}" "n/a" "$status"
+    fi
 done
+[ $FAIL -eq 0 ] || { echo "TRAIN: SOME CASES FAILED; ratios are shown only for valid runs" >&2; exit 1; }
+exit 0
