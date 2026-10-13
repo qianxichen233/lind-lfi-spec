@@ -46,13 +46,15 @@ for b in "${benches[@]}"; do
         [ -f "$g" ] || { out_bad="$out_bad missing:$base"; continue; }
         cmp -s "$f" "$g" && continue
         case $base in
-            *.out) python3 "$HERE/numdiff.py" "$f" "$g" || out_bad="$out_bad $base";;
+            log.dec) continue;;   # x264's decoder log embeds the wall-clock time
+            *.out|*.output) python3 "$HERE/numdiff.py" "$f" "$g" || out_bad="$out_bad $base";;
             *) out_bad="$out_bad $base";;
         esac
     done
     status=ok
     [ -n "$exit_bad" ] && status="EXIT FAIL:$exit_bad"
-    [ -n "$out_bad" ] && status="$status OUTPUT DIFFERS:$out_bad"
-    [ "$status" = ok ] && status=ok
+    if [ -n "$out_bad" ]; then
+        [ "$status" = ok ] && status="OUTPUT DIFFERS:$out_bad" || status="$status; OUTPUT DIFFERS:$out_bad"
+    fi
     printf '%-11s %12s %12s %8.2fx  %s\n' "$b" "$best_n" "$best_l" "$(awk -v a="${best_l:-0}" -v b="${best_n:-1}" 'BEGIN{printf "%.3f", a/b}')" "$status"
 done
