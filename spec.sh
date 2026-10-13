@@ -22,6 +22,10 @@ declare -A REQ=(
     [imagick]="test_output.tga" [perlbench]="makerand.out test.out"
     [deepsjeng]="deepsjeng_r.out" [namd]="namd_r.out apoa1.test.output" [leela]="leela_r.out"
     [omnetpp]="omnetpp.General-0.out General-0.sca" )
+declare -A NONEMPTY=(
+    [lbm]="lbm_r.out" [mcf]="mcf_r.out" [nab]="nab_r.out" [gcc]="t1.opts-O3_-finline-limit_50000.s"
+    [x264]="frame_0.yuv frame_155.yuv" [imagick]="test_output.tga" [deepsjeng]="deepsjeng_r.out"
+    [namd]="namd_r.out apoa1.test.output" [leela]="leela_r.out" [omnetpp]="omnetpp.General-0.out" )
 FAIL=0   # set by any problem in any requested case; the script exits non-zero if it is set
 printf '%-11s %12s %12s %9s  %s\n' bench "native(ms)" "lfi(ms)" ratio status
 for b in "${benches[@]}"; do
@@ -50,7 +54,12 @@ for b in "${benches[@]}"; do
     # Required artifacts must exist and be non-empty on both sides ...
     for f in ${REQ[$b]}; do
         for t in native lfi; do
-            [ -s "$HERE/work/$t/${b}_r/$f" ] || out_bad="$out_bad required-missing-or-empty($t):$f"
+            [ -f "$HERE/work/$t/${b}_r/$f" ] || out_bad="$out_bad required-missing($t):$f"
+        done
+    done
+    for f in ${NONEMPTY[$b]:-}; do   # artifacts that carry the result and are never empty
+        for t in native lfi; do
+            [ -s "$HERE/work/$t/${b}_r/$f" ] || out_bad="$out_bad required-empty($t):$f"
         done
     done
     # ... and every other file either side produced (recursively; executables and stderr logs
