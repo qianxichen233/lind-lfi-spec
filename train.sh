@@ -19,6 +19,8 @@ stage_and_run() {
     for ((r = 0; r < REPS; r++)); do
         local t0=$(date +%s%N)
         ( cd "$d" && eval "cmds_$name \"\$runner\" \"\$d\"" ) >/dev/null 2>"$d/err.txt"
+        rc=$?
+        [ $rc -ne 0 ] && echo "rep$r: exit $rc" >> "$d/status.txt"
         times+=("$(ms $t0)")
     done
     printf '%s\n' "${times[@]}" | median
@@ -44,11 +46,20 @@ for b in ${BENCHES:-gcc mcf imagick omnetpp}; do
         res+=("$(stage_and_run $b "$e" $plat "$runner")")
         # keep outputs for comparison
     done
+    # execution status and output agreement are separate conditions; both are required
     status=ok
     a=$HERE/work/train/native-linux/$b; l=$HERE/work/train/lfi/$b
-    for f in $(cd $a && ls | grep -v -E "^(err.txt|cpugcc_r|mcf_r|imagick_r|omnetpp_r|ned|.*\.(c|tga|ini|in))$|^train_input"); do
-        cmp -s $a/$f $l/$f || python3 $HERE/numdiff.py $a/$f $l/$f || status="OUTPUT DIFFERS ($f)"
+    for p in native-linux lfi; do
+        [ -s $HERE/work/train/$p/$b/status.txt ] && status="EXIT FAIL($p): $(tr '\n' ' ' < $HERE/work/train/$p/$b/status.txt)"
     done
-    [ -s $l/err.txt ] && grep -q "rror\|illegal" $l/err.txt && status="errors: $(head -c 100 $l/err.txt)"
+    out_bad=
+    # compare every produced file (stdout, images, assembly), skipping only inputs, executables and stderr
+    for f in $(cd $a && ls | grep -v -E "^(err.txt|status.txt|cpugcc_r|mcf_r|imagick_r|omnetpp_r|ned|train_input.tga|omnetpp.ini|inp.in|200.c|scilab.c|train01.c)$"); do
+        [ -f $l/$f ] || { out_bad="$out_bad missing:$f"; continue; }
+        cmp -s $a/$f $l/$f && continue
+        case $f in *.txt|*.s) python3 $HERE/numdiff.py $a/$f $l/$f || out_bad="$out_bad $f";; *) out_bad="$out_bad $f";; esac
+    done
+    [ -n "$out_bad" ] && status="$status OUTPUT DIFFERS:$out_bad"
+    [ -s $l/err.txt ] && grep -q "rror\|illegal" $l/err.txt && status="$status stderr: $(head -c 100 $l/err.txt)"
     printf '%-10s %12s %12s %8.2fx  %s\n' "$b" "${res[0]}" "${res[1]}" "$(awk -v a="${res[1]}" -v b="${res[0]}" 'BEGIN{printf "%.3f", a/b}')" "$status"
 done
