@@ -5,11 +5,27 @@
 #   LFI_GRATES="path/to/grate [args]"   grate chain in front of the benchmark
 set -u
 HERE=$(cd "$(dirname "$0")" && pwd)
-export PATH=/home/lind/lfi/.toolchain/x86_64-lfi-clang/lfi-bin:$PATH
-RUNTIME=${RUN:-/home/lind/lfi/lfi-runtime/build/tools/lfi-3i-run/lfi-3i-run}
+# LFI_ROOT: a bootstrapped, built lind-lfi checkout. SPEC_ROOT: your licensed SPEC CPU2017 tree (the
+# directory that contains benchspec/). See README.md.
+: "${LFI_ROOT:?set LFI_ROOT to your lind-lfi checkout}"
+: "${SPEC_ROOT:?set SPEC_ROOT to the directory that contains benchspec/ (licensed SPEC CPU2017)}"
+export SPEC_ROOT
+# The native baseline is built with an ordinary clang (the comparison used LLVM 18.1.8, as Lind's
+# evaluation does). NATIVE_CLANG_DIR is the LLVM install to use (it contains bin/clang,
+# bin/clang++, bin/llvm-ar, bin/llvm-ranlib); by default the first clang on PATH, resolved
+# before the LFI compilers are put on PATH. The compile scripts read it from build/.toolchain.env.
+if [ -z "${NATIVE_CLANG_DIR:-}" ]; then
+    _c=$(command -v clang) || { echo "spec.sh: no clang on PATH for the native build; set NATIVE_CLANG_DIR" >&2; exit 1; }
+    NATIVE_CLANG_DIR=$(cd "$(dirname "$(readlink -f "$_c")")/.." && pwd)
+fi
+mkdir -p "$HERE/build"
+printf 'CLANG=%s/bin/clang\nCLANGPP=%s/bin/clang++\nAR=%s/bin/llvm-ar\nRANLIB=%s/bin/llvm-ranlib\n' \
+    "$NATIVE_CLANG_DIR" "$NATIVE_CLANG_DIR" "$NATIVE_CLANG_DIR" "$NATIVE_CLANG_DIR" > "$HERE/build/.toolchain.env"
+export PATH=$LFI_ROOT/.toolchain/x86_64-lfi-clang/lfi-bin:$PATH
+RUNTIME=${RUN:-$LFI_ROOT/lfi-runtime/build/tools/lfi-3i-run/lfi-3i-run}
 REPS=3; [ "${1:-}" = -n ] && { REPS=$2; shift 2; }
 benches=("$@"); [ ${#benches[@]} -eq 0 ] && benches=(lbm mcf nab gcc xz x264 imagick perlbench deepsjeng namd leela omnetpp)
-export LIND_WASM_ROOT=/home/lind/lind-wasm
+export LIND_WASM_ROOT=${LIND_WASM_ROOT:-$HERE}   # only the wasm targets of the compile scripts use it
 declare -A num=( [lbm]=519.lbm_r [mcf]=505.mcf_r [nab]=544.nab_r [gcc]=502.gcc_r [xz]=557.xz_r [x264]=525.x264_r [imagick]=538.imagick_r [perlbench]=500.perlbench_r [deepsjeng]=531.deepsjeng_r [namd]=508.namd_r [leela]=541.leela_r [omnetpp]=520.omnetpp_r )
 total_ms() { awk '/elapsed:/{gsub(/ms/,"",$NF); t+=$(NF-1)} END{print t+0}'; }
 # Artifacts each benchmark must produce on BOTH sides (non-empty); anything else either side

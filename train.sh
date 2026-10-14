@@ -3,9 +3,11 @@
 # for gcc, mcf, imagick, omnetpp; native vs LFI, same protocol as spec.sh.
 set -u
 HERE=$(cd "$(dirname "$0")" && pwd)
-RUNTIME=${RUN:-/home/lind/lfi/lfi-runtime/build/tools/lfi-3i-run/lfi-3i-run}
+: "${LFI_ROOT:?set LFI_ROOT to your lind-lfi checkout}"
+: "${SPEC_ROOT:?set SPEC_ROOT to the directory that contains benchspec/}"
+RUNTIME=${RUN:-$LFI_ROOT/lfi-runtime/build/tools/lfi-3i-run/lfi-3i-run}
 REPS=3; [ "${1:-}" = -n ] && REPS=$2
-B=$HERE/benchspec/CPU; BIN=$HERE/build/bin
+B=$SPEC_ROOT/benchspec/CPU; BIN=$HERE/build/bin
 ms() { echo $(( ($(date +%s%N) - $1) / 1000000 )); }
 median() { sort -n | sed -n "$(( (REPS + 1) / 2 ))p"; }
 

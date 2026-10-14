@@ -54,7 +54,7 @@ if [[ "$TARGET" == "lfi" ]]; then
 fi
 
 BENCH="519.lbm_r"
-SRC="$REPO_ROOT/benchspec/CPU/$BENCH/src"
+SRC="${SPEC_ROOT:-$REPO_ROOT}/benchspec/CPU/$BENCH/src"
 OUT="$BUILD_DIR/bin/$BENCH/$PLAT_DIR"
 mkdir -p "$OUT"
 

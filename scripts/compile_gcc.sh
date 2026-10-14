@@ -40,9 +40,37 @@ if [[ "$TARGET" == "lfi" ]]; then
 fi
 
 BENCH="502.gcc_r"
-SRC="$REPO_ROOT/benchspec/CPU/$BENCH/src"
-# LFI: a copy with set_cfg_hooks taking a pointer (compiler bug with large by-value structs)
-[[ "$TARGET" == "lfi" ]] && SRC="$BUILD_DIR/src-gcc-lfi"
+SRC="${SPEC_ROOT:-$REPO_ROOT}/benchspec/CPU/$BENCH/src"
+# LFI: a copy of the source with set_cfg_hooks taking a pointer instead of a ~300-byte struct by
+# value: the LFI v0.12 compiler copies such an argument with an unsandboxed "rep movsq" that the
+# verifier rejects. Same behaviour; the edit is made here, to a private copy, at build time.
+if [[ "$TARGET" == "lfi" ]]; then
+  ORIG="${SPEC_ROOT:-$REPO_ROOT}/benchspec/CPU/$BENCH/src"
+  SRC="$BUILD_DIR/src-gcc-lfi"
+  if [[ -d "$ORIG" ]]; then
+    rm -rf "$SRC"; cp -r "$ORIG" "$SRC"
+    python3 - "$SRC" <<'PY'
+import sys
+d = sys.argv[1]
+def edit(name, pairs):
+    p = d + "/" + name
+    s = open(p, encoding="latin-1").read()
+    for old, new in pairs:
+        if s.count(old) != 1:
+            sys.exit(f"compile_gcc: expected exactly one occurrence of {old!r} in {name}")
+        s = s.replace(old, new)
+    open(p, "w", encoding="latin-1").write(s)
+edit("cfghooks.c", [
+    ("set_cfg_hooks (struct cfg_hooks new_cfg_hooks)", "set_cfg_hooks_p (const struct cfg_hooks *new_cfg_hooks)"),
+    ("*cfg_hooks = new_cfg_hooks;", "*cfg_hooks = *new_cfg_hooks;"),
+])
+edit("cfghooks.h", [
+    ("extern void set_cfg_hooks (struct cfg_hooks);",
+     "extern void set_cfg_hooks_p (const struct cfg_hooks *);\n#define set_cfg_hooks(h) set_cfg_hooks_p (&(h))"),
+])
+PY
+  fi
+fi
 OUT="$BUILD_DIR/bin/$BENCH/$PLAT_DIR"
 mkdir -p "$OUT"
 

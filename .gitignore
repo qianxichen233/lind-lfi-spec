@@ -1,4 +1,4 @@
 build/
 work/
-benchspec
-*.md
+# licensed SPEC CPU2017 content must never be committed: point SPEC_ROOT at it or symlink it here
+/benchspec

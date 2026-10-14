@@ -1,0 +1,13 @@
+bench         native(ms)      lfi(ms)     ratio  status
+lbm                  757          785     1.04x  ok
+mcf                 5262         5871     1.12x  ok
+nab                  532          869     1.63x  ok
+gcc                   14          259    18.50x  ok
+xz                  4782         5464     1.14x  ok
+x264               12429        13945     1.12x  ok
+imagick               15           70     4.67x  ok
+perlbench            135          273     2.02x  ok
+deepsjeng           3630         4377     1.21x  ok
+namd                1689         2075     1.23x  ok
+leela               2706         3347     1.24x  ok
+omnetpp             1442         6167     4.28x  ok

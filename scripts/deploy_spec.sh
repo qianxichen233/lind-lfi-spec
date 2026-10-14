@@ -7,7 +7,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$SCRIPT_DIR/.."
 BUILD_DIR="$REPO_ROOT/build"
-BENCH_SRC="$REPO_ROOT/benchspec/CPU"
+BENCH_SRC="${SPEC_ROOT:-$REPO_ROOT}/benchspec/CPU"
 
 LIND_WASM_ROOT="${LIND_WASM_ROOT:-$HOME/lind-wasm}"
 LINDFS="$LIND_WASM_ROOT/lindfs"

@@ -39,7 +39,7 @@ if [[ "$TARGET" == "lfi" ]]; then
 fi
 
 BENCH="557.xz_r"
-SRC="$REPO_ROOT/benchspec/CPU/$BENCH/src"
+SRC="${SPEC_ROOT:-$REPO_ROOT}/benchspec/CPU/$BENCH/src"
 OUT="$BUILD_DIR/bin/$BENCH/$PLAT_DIR"
 mkdir -p "$OUT"
 

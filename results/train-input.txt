@@ -1,0 +1,5 @@
+bench(train)   native(ms)      lfi(ms)     ratio  status
+gcc               18192        30013     1.65x  ok
+mcf               30361        33880     1.12x  ok
+imagick           14092        15517     1.10x  ok
+omnetpp           27632        45685     1.65x  ok
