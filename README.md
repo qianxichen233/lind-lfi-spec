@@ -21,7 +21,7 @@ The build scripts and command lines derive from the evaluation scripts of
 * An ordinary clang for the native baseline: `export NATIVE_CLANG_DIR=` an LLVM install (default: the
   first `clang` on `PATH`). The reported numbers used LLVM 18.1.8; the LFI side uses the LFI clang 23 /
   musl from the `lind-lfi` bundle, so the two sides differ in compiler and libc (see below).
-* `python3` (output comparison), `taskset` is not required.
+* `python3` (output comparison).
 
 ## Usage
 
